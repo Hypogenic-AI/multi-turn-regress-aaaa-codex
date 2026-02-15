@@ -1,0 +1,298 @@
+Intent Mismatch Causes LLMs to Get Lost in Multi-Turn Conversation
+Geng Liu1,2, Fei Zhu2, Rong Feng1,2, Changyi Ma3, Shiqi Wang1, Gaofeng Meng2
+1College of Computing, City University of Hong Kong, Hong Kong SAR, China.
+2Centre for Artificial Intelligence and Robotics, HKISI, CAS
+3School of Artificial Intelligence, Jilin University, China
+gengliu6@my.cityu.edu.hk, zhfei2018@gmail.com
+Abstract
+Multi-turn conversation has emerged as a pre-
+dominant interaction paradigm for Large Lan-
+guage Models (LLMs). Users often employ
+follow-up questions to refine their intent, ex-
+pecting LLMs to adapt dynamically. However,
+recent research (Laban et al., 2025) reveals that
+LLMs suffer a substantial performance drop
+in multi-turn settings compared to single-turn
+interactions with fully specified instructions,
+a phenomenon termed “Lost in Conversation”
+(LiC). While this prior work attributes LiC to
+model unreliability, we argue that the root cause
+lies in anintent alignment gaprather than in-
+trinsic capability deficits. In this paper, we first
+demonstrate that LiC is not a failure of model
+capability but rather a breakdown in interac-
+tion between users and LLMs. We theoreti-
+cally show that scaling model size or improv-
+ing training alone cannot resolve this gap, as
+it arises from structural ambiguity in conversa-
+tional context rather than representational limi-
+tations. To address this, we propose to decou-
+ple intent understanding from task execution
+through a Mediator-Assistant architecture. By
+utilizing an experience-driven Mediator to ex-
+plicate user inputs into explicit, well-structured
+instructions based on historical interaction pat-
+terns, our approach effectively bridges the gap
+between vague user intent and model inter-
+pretation. Experimental results demonstrate
+that this method significantly mitigates perfor-
+mance degradation in multi-turn conversations
+across diverse LLMs.
+1 Introduction
+In contemporary AI-assisted applications, multi-
+turn dialogue has become the primary mode of in-
+teraction between users and large language models
+(LLMs). Thanks to their massive parameter scales
+and extensive pretraining on diverse corpora, mod-
+ern LLMs now exhibit impressive capabilities in
+language understanding, reasoning, and task execu-
+tion, and they often perform remarkably well when
+given clear, complete, and well-structured instruc-
+tions in a single turn. However, real-world user
+behavior rarely conforms to this idealized setting.
+In practice, users frequently start with vague, under-
+specified, or even internally inconsistent goals, and
+only gradually clarify and refine their true needs
+through an iterative conversational process with
+the model (Zamfirescu-Pereira et al., 2023; Min
+et al., 2020). This incremental, exploratory nature
+of human problem formulation poses substantially
+greater challenges for LLMs than standard single-
+turn benchmarks: the model must not only under-
+stand and solve the current subtask, but also con-
+tinually infer, update, and realign with a moving
+target of user intent across turns.
+Recent research (Laban et al., 2025) presents
+a set of controlled experiments designed to sim-
+ulate the instruction underspecification that fre-
+quently occurs in human conversation (Herlihy
+et al., 2024; Zipf, 1949). The study systematically
+compares performance under “single-turn, fully
+specified” (Full) versus “multi-turn, underspeci-
+fied” (Sharded) interactions, revealing a substantial
+performance degradation of approximately 30%
+for all evaluated LLMs. The authors argue that
+under incomplete information, LLMs tend to make
+premature assumptions early in the dialogue and
+subsequently “lock in” these assumptions, causing
+the final responses to drift away from the user’s
+true intent. They term this phenomenon “Lost in
+Conversation” (LiC) and primarily attribute it to
+the reduced reliability of LLMs in multi-turn di-
+alogue. On this basis, they advocate that LLMs
+should natively support multi-turn interaction and
+that model builders should jointly optimize models’
+aptitude and reliability in iterative conversational
+settings.
+In this work, we revisit this phenomenon and
+offer a different explanatory perspective. We argue
+that: (1)Making early assumptions and provid-
+ing tentative answers is not simply erroneous
+arXiv:2602.07338v1  [cs.CL]  7 Feb 2026
+Implement XXX
+def function(x):
+[……]
+Turn 1
+Turn 2
+(Baseline)
+I want [Requirement 1]
+(Not quite satisfied) Oh, I need to add some 
+information to the original request.
+It seems the user has accepted my solution, 
+so now I'll continue to refine the solution.
+def function(x, y):
+[……]
+User
+User
+Assistant
+Implement XXX, with 
+[Requirement 1] 
+The user hasn't explicitly accepted the current 
+solution, so the real intention is likely to add 
+information to the initial request.
+def function(y):
+[……]Assistant
+Turn 2
+(w/ Mediator)
+I want [Requirement 1]
+(Not quite satisfied) Oh, I need to add some 
+information to the original request.
+Assistant
+The user has provided additional information for 
+the initial request, so I will rework the solution.
+Intent Mismatch Mediator
+Intent Match
+User
+Figure 1:Intent Mismatch in Multi-turn Dialogue.(Left) The LiC benchmark simulates passive users who act as
+“lazy” interlocutors, omitting corrections for erroneous model assumptions. This behavior causes the Assistant’s
+interpretation to progressively drift away from the user’s true intent, leading to significant performance degradation.
+(Right) Our approach introduces a Mediator to bridge this pragmatic gap by fundamentally decoupling intent
+inference from task execution. The Mediator aligns the Assistant with the user’s true goals, effectively mitigating
+performance degradation.
+behavior, but a rational strategy induced by
+the dominant training objective of being helpful
+(Ouyang et al., 2022) and the penalty often asso-
+ciated with evasive responses in RLHF pipelines.
+Under conditions of incomplete information, the
+model is inclined to construct a plausible task for-
+mulation for a typical user and produce a provi-
+sional answer based on that formulation, instead of
+repeatedly refusing to answer or endlessly request-
+ing additional information. (2)The primary bot-
+tleneck in failed multi-turn conversations is not
+a lack of model capacity or reasoning depth, but
+a pragmatic mismatch between user expression
+and model interpretation(Figure 1 left). Users
+exhibit systematic individual variation, where the
+same utterance may map to disparate underlying
+intentions. General-purpose LLMs, aligned to the
+“average” user, fail to adapt to these idiosyncratic
+behaviors. For instance, models frequently mis-
+interpret a user’s fragmentary continuation as a
+confirmation of previous assumptions rather than
+a correction, thereby reinforcing an incorrect con-
+text.
+To address this, we propose a framework
+that fundamentally decouples intent understand-
+ing from task execution. We operationalize this
+through a Mediator-Assistant pipeline, where a Me-
+diator explicates user inputs to explicitly articulate
+latent requirements before they reach the execution
+Assistant. To align with specific user pragmatics,
+we employ an LLM-based Refiner to automatically
+distill explicit guidelines by analyzing the discrep-
+ancies between failed and successful interaction
+trajectories. These guidelines then serve as context
+for the Mediator, enabling the system to bridge the
+alignment gap and adapt to individual user behav-
+iors without the need for weight updates.
+Our approach directly addresses the root cause
+of LiC: the misalignment between how users ex-
+press intent and how models interpret it (Figure 1
+right). By bridging this gap through adaptive in-
+put rewriting, we demonstrate substantial recovery
+of multi-turn performance across diverse LLMs,
+highlighting the critical role of user-aware intent
+modeling in conversational AI.
+2 Related Works
+Multi-turn Dialogue Evaluation.Recent bench-
+marks for multi-turn dialogue, such as MT-
+Bench (Zheng et al., 2023), MT-Bench-101 (Bai
+et al., 2024), and LOCOMO (Maharana et al.,
+2024), primarily focus on either (i) sequential task
+decomposition (e.g., planning a trip over multiple
+steps) or (ii) long-context retention in extended con-
+versations. However, these settings often assume
+that each turn is sufficiently specified or that the
+full task context is available early in the dialogue.
+In contrast, our work targets a more challenging
+regime:incremental intent revelation, where the
+user’s goal is only partially observable at each turn
+and may contradict earlier model assumptions—a
+scenario systematically studied in the “Lost in Con-
+versation” (LiC) framework (Laban et al., 2025)
+but largely overlooked by existing benchmarks.
+Clarification and Intent Disambiguation.An-
+other line of research encourages LLMs to ac-
+tively seek clarification when faced with ambigu-
+ous queries (Li, 2025; Herlihy et al., 2024). While
+effective in controlled settings, such approaches
+often conflict with real-world helpfulness norms,
+as users typically expect immediate, provisional re-
+sponses rather than repeated clarification requests.
+As argued in Section 1, premature assumption-
+making is a rational outcome of prevailing training
+objectives. Instead of modifying the model’s be-
+havior, we preserve its default helpfulness while
+correcting misinterpretations upstream, through an
+adaptive mediator that refines inputs into unam-
+biguous and complete instructions.
+Personalization in LLMs.A growing body of
+work explores personalizing LLMs via parameter-
+efficient fine-tuning (PEFT) (Xu et al., 2023),
+user-specific adapters (Zhong et al., 2021), or
+memory-augmented architectures. Systems like
+Mem0 (Chhikara et al., 2025), A-Mem (Xu et al.,
+2025), and MemoryBank (Zhong et al., 2024) store
+user facts to enable long-term contextual awareness.
+However, these approaches primarily addressfac-
+tualpersonalization (e.g., remembering user pref-
+erences) rather thanpragmaticalignment, which is
+the challenge of interpreting ambiguous utterances
+according to a user’s idiosyncratic expression style.
+3 Problem Analysis
+We formulate the multi-turn interaction between
+a user and an LLM assistant within a latent vari-
+able framework. Let It ∈ I denote the user’s deep
+intent (the specific goal) at turn t, and T∈ T rep-
+resent the user’s expression habits and pragmatic
+patterns. In the t-th turn of interaction, the input
+to the LLM is the accumulated dialogue context
+Ct, consisting of the sequence of historical user
+utterances and assistant responses:
+Ct = (u1, a1, u2, a2, . . . , ut).(1)
+The user’s current utterance ut is generated via
+a stochastic process ut ∼P user(u|I t, T, Ct−1).
+Crucially, this process acts as a lossy projection,
+where complex, high-dimensional intents are com-
+pressed into low-dimensional and often ambiguous
+surface forms. The LLM, defined by parameters θ,
+aims to generate a response R conditioned on the
+observed context:
+R∼P θ(R|C t).(2)
+3.1 Performance Decomposition
+We posit that the model’s performance in multi-
+turn scenarios is not a monolithic metric but can
+be theoretically decomposed into two orthogonal
+components: (1) Intent Inference, the ability to
+recover the true intent It from Ct; and (2) Task
+Execution, the ability to solve the identified intent
+It. Assuming that the true intent It is a sufficient
+statistic for the task such that R becomes condition-
+ally independent of the noisy context Ct given It
+(i.e.,P θ(R|I t)≈P θ(R|I t, Ct)), we derive:
+Pθ(R|C t) =
+X
+It∈I
+Pθ(R|I t)| {z }
+Execution
+·P θ(It |C t)| {z }
+Inference
+. (3)
+This decomposition reveals the fundamental
+mechanism behind performance degradation in
+multi-turn dialogues. The execution capability
+Pθ(R|I t) represents the model’s intrinsic rea-
+soning ability given a perfectly defined instruc-
+tion. This is largely determined by the model’s
+pre-training and remains relatively stable for a spe-
+cific task. However, the accuracy of intent infer-
+ence Pθ(It |C t) faces severe challenges as inter-
+actions progress. In an ideal single-turn setting,
+users tend to provide self-contained descriptions,
+making the intent It clearly inferable from the utter-
+ance. Conversely, in multi-turn dialogues, driven
+by theprinciple of least effortand individual habits
+(T ), users often generate highly personalized, am-
+biguous, and fragmented surface forms (e.g., using
+pronouns or vague directives) based on the same in-
+tent It. This pragmatic ellipsis significantly widens
+the semantic gap between the surface utterance and
+the deep intent. Consequently, the LLM fails not
+because it loses the capability to solve the problem,
+but because it cannot penetrate the user’s ambigu-
+ous expression to clearly define the problem.
+3.2 The Information Bottleneck
+The challenge of maximizing P(I t |C t) is not
+merely a lack of model capacity, but an information-
+theoretic limit. Mathematically, the conditional
+entropy of the user’s intent given the context,
+H(I t |C t), remains high because the mapping
+from intent to utterance is many-to-one. When
+critical constraints are omitted by the user due to
+lossy compression, the missing information bits are
+simply absent fromC t.
+Under such high uncertainty, a frozen LLM Pθ
+tends to revert to its training priors. It implic-
+itly solves for arg maxIt Ppretrain(It |C t), align-
+ing with the “average user” rather than the spe-

@@ -1,0 +1,13 @@
+\section{Methodology}
+\label{sec:methodology}
+\para{Problem formulation.} We test whether multi-turn context causes ``prior regression,'' which we define as a turn-indexed drift toward higher compliance with harmful requests and lower success on benign tasks. We compare outcomes at turn count 1 (\singleturn) versus turn count 3 (\multiturn) while holding the final request fixed.
+
+\para{Datasets.} We evaluate two safety datasets and one benign dataset. \jbb provides harmful goal requests \cite{jbb2024}; \wildjb contains in-the-wild jailbreak prompts labeled benign/adversarial \cite{wildjailbreak2024}; \mtbench contains multi-turn general tasks \cite{mtbench2023}. We sample 20 examples from each dataset (seed 42) to control costs, and we verify no missing values or duplicates by naive string matching.
+
+\para{Multi-turn construction.} For \jbb and \wildjb, we create three-turn sequences by prepending two benign lead-in turns and keeping the final harmful request identical to the single-turn baseline. This isolates the effect of turn history while keeping the target content constant. For \mtbench, we use the provided two-turn prompts and score success at turn 1 and turn 2.
+
+\para{Models and inference.} We use \gptfourone for both generation and judging. We set temperature to 0, max tokens to 256, and a fixed seed of 42 for determinism. Each prompt is run once due to cost constraints.
+
+\para{Evaluation metrics.} For safety prompts, we use an LLM judge to classify each response as refusal or compliance, and we report compliance and refusal rates by turn. For benign tasks, we use the judge to assign binary success at each turn and report success rates. We compute paired statistics between turn 1 and turn 3 (or turn 2 for \mtbench).
+
+\para{Statistical tests.} We use the Wilcoxon signed-rank test for paired differences when normality is not assumed. We report $p$-values and mean differences for turn-indexed changes.

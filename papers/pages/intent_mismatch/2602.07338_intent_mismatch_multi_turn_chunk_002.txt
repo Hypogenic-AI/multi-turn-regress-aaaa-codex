@@ -1,0 +1,287 @@
+Diverse Capacity
+ Instant Degradation
+Figure 2:Performance comparison across different LLMs on the LiC benchmark (Laban et al., 2025).While
+absolute performance improves with model scale, the relative performance degradation remains strikingly constant
+(∼60%). This structural invariance suggests that the bottleneck lies in the alignment prior rather than model capacity.
+cific individual. This manifests as generic conver-
+gence: the model assumes the most statistically
+probable intent, leading to the LiC phenomenon
+where the model confidently answers the wrong
+question. Scaling the model size (θ) does not solve
+this; it merely allows the model to better fit the
+prior distribution of the average user, essentially
+reinforcing the misalignment. When contextual
+uncertainty is high, a frozen LLM defaults to its
+pretraining prior, generating It that maximizes (ap-
+proximately) Pθ(It |C t). Since this distribution
+encodes population-level patterns rather than in-
+dividual preferences, the output often reflects a
+stereotypical “average user,” leading to confidently
+incorrect responses (LiC). Scaling model size only
+sharpens this prior, exacerbating the misalignment
+in the absence of personalized signals.
+This theoretical limitation is corroborated by em-
+pirical evidence. As illustrated in Figure 2, a re-
+analysis of experimental results from Laban et al.
+(2025) reveals a striking pattern: while stronger
+models achieve higher absolute scores, therela-
+tive performance degradationbetween fully spec-
+ified and underspecified settings remains remark-
+ably constant (approximately 60%) across diverse
+model sizes and families. We attribute thisinvari-
+ant degradationto the homogeneity of the align-
+ment prior. Although models differ in capacity θ,
+they are predominantly pre-trained and aligned on
+similar vast corpora, leading them to converge to-
+wards a shared representation of the “average user”
+(Pavg). In the absence of specific constraints, all
+models fall back to this shared prior:
+arg max
+It
+Pθ(It |C t)≈arg max
+It
+Pavg(It |C t).
+(4)
+Since the specific user intents in the benchmark
+deviate from this population mean in a fixed man-
+ner, the divergence between the actual user intent
+and the average prior acts as a constant structural
+penalty. Consequently, merely scaling model pa-
+rameters optimizes the fit to Pavg but does not
+bridge the semantic gap to the specific individual,
+rendering the ambiguity strictly unresolvable via
+scaling alone.
+3.3 Reducing Entropy via History
+The decomposition in Eq. (3) implies that to im-
+prove performance, we must sharpen the distribu-
+tion P(I t |. . .) . Since the entropy H(I t |C t)
+is constrained by the information loss in Ct, we
+must introduce an auxiliary variable: the user’s
+generalized interaction history, denoted asH.
+We propose that while Ct is ambiguous on its
+own, the extended context (Ct,H) contains suffi-
+cient information to recover It. By encapsulating
+longitudinal evidence of user behavior, including
+past dialogue trajectories and interaction outcomes,
+H implicitly encodes the user’s specific expression
+habits T and effectively acts as the “compression
+key”.
+Our method introduces a Mediator M to approx-
+imate this inference process. Instead of asking the
+general model to guess It solely from Ct, the Me-
+diator computes:
+ˆU∼P(U|C t,H).(5)
+Here, ˆU is a reconstructed, fully-specified instruc-
+tion that acts as a proxy for the latent intent It.
+By conditioning on H, the Mediator significantly
+reduces the conditional entropy:
+H(I t |C t,H)≪H(I t |C t).(6)
+The downstream LLM then operates on this low-
+entropy input: R∼P θ(R| ˆU). This effectively
+bypasses the information bottleneck, allowing the
+Fail Attempt 𝐷𝐷0
+−
+Success Interaction 𝐷𝐷0
++
+Trajectories of Instance 0 
+Pair 0 𝐷𝐷−, 𝐷𝐷+ 0
+……
+User-aware Experiences 𝜀𝜀𝑢𝑢
+𝑒𝑒0: Extract contextual details 
+provided by the user ……
+𝑒𝑒1 : Ignore AI responses unless 
+the user approves ……
+B. Get User-aware Experience
+Vague 
+Request U
+𝜀𝜀𝑢𝑢
+Request with 
+inferred intent
+User Assistant
+MediatorRefiner
+C. Interaction with MediatorA. Construction of Contrastive Pairs
+Intent Inference
+Reply
+Reply
+……
+Fail Attempt 𝐷𝐷1
+−
+Success Interaction𝐷𝐷1
++
+Pair 1 𝐷𝐷−, 𝐷𝐷+ 1
+Fail Attempt (𝐷𝐷0
+−)0
+Fail Attempt (𝐷𝐷0
+−)1
+Success Interaction 𝐷𝐷0
++
+……
+Contrastive Pairs
+Interaction History
+User Assistant
+Figure 3:Pipeline of the Mediator Framework.We construct contrastive pairs by extracting a failed conversational
+trajectory D− and the corresponding successful trajectory D+ for the same task instance from the user’s historical
+logs. The Refiner distills these pairs into explicit pragmatic experiences E, which guide the Mediator to explicate
+ambiguous user contexts into precise instructions for the Assistant. The Mediator operates as a transparent alignment
+layer, decoupling the user from the raw execution model while maintaining a seamless interaction flow.
+general model to execute tasks with the clarity and
+precision of a single-turn interaction.
+4 Method
+Building upon the analysis in §3, we propose a
+Mediator-Assistant framework designed to resolve
+the pragmatic mismatch in multi-turn dialogues.
+To bridge the information gap, we leverage the
+user’s generalized history H. In our implemen-
+tation, H consists of raw contrastive interaction
+pairs (successful vs. failed trajectories). However,
+raw history could be noisy and high-dimensional.
+Therefore, we introduce a Refiner module (R) to
+distill H into a compact set of explicit Experiences
+(E). These experiences serve as the “pragmatic
+profile” for the Mediator M. Our approach adopts
+a training-free, experience-driven paradigm. This
+strategic choice ensures immediate adaptability:
+the system learns from history without parameter
+updates, bypassing the storage and versioning over-
+heads of per-user fine-tuning.
+4.1 The Mediator Framework
+The core premise, as derived in Eq. (3), is that the
+raw context Ct acts as a lossy compression of the
+true intent It. Direct interaction fails because the
+generic Assistant (A) maximizes P(R|C t) based
+on population priors rather than individual intent.
+The Mediator acts as an alignment layer, approxi-
+mating the inference distribution by conditioning
+on the distilled experiences:P(I t |C t,E).
+The Mediator takes the accumulated contextC t
+and experiences E. It analyzes the discrepancy
+between the surface utterance and the latent intent,
+generating a reconstructed instruction ˆU. This ˆU
+is an explicit, fully specified articulation of It. The
+Assistant A then generates the response based on
+this low-entropy input:
+R=A( ˆU),where ˆU≈I t.(7)
+For a specific user, the distilled experiences are
+aggregated into a fixed knowledge base Eu, which
+will be injected into the Mediator as a system in-
+struction. Mathematically, the Mediator performs
+the mapping:
+ˆU=M(C t | E u).(8)
+During inference, the Mediator references this es-
+tablished profile to interpret the current context
+Ct. Since Eu explicitly encodes the user’s specific
+pragmatic habits and constraints, M can accurately
+detect omitted information in the surface utterance
+and synthesize the clarified prompt ˆU.
+4.2 Experience Acquisition
+This subsection details how we construct the raw
+history H and how the Refiner transforms it into
+actionable experiencesE.
+Contrastive Pair Construction.We premise our
+data construction on a pervasive behavioral pattern
+in human-computer interaction: iterative query re-
+formulation (Huang and Efthimiadis, 2009; Odijk
+et al., 2015). Real-world users typically exhibit
+goal-directed persistence; when an initial ambigu-
+ous utterance fails to elicit the desired response,
+users rarely abandon the task immediately. Instead,
+they engage in a trial-and-error process, refining
+their instructions until the model successfully ex-
+ecutes the task. This behavior naturally yields a
+dataset of paired trajectories within successful ses-
+sions. We view the final, successful turn as the
+ground-truth articulation (D+) of the user’s intent,
+while the preceding failed interaction sequence
+serves as the ambiguous context ( D−). We de-
+fine the generalized history H as a collection of
+contrastive interaction pairs (D−, D+). From an
+information-theoretic perspective, the difference
+between D− and D+ explicitly reveals the latent
+information bits that were omitted in the ambiguous
+context but are required to reduce the conditional
+entropyH(I t |C t).
+To operationalize this framework within our sim-
+ulation benchmark, we construct these pairs syn-
+thetically using interaction logs. We identify in-
+stances where the model exhibits performance dis-
+crepancies: specifically, instances where the model
+fails in the multi-turn conversational setting but suc-
+ceeds when the same task is presented in a single-
+turn format. From these instances, we construct
+discrete contrastive pairs. For each task selected
+for experience mining, we sample a single specific
+failed conversational trajectory to serve as D− and
+pair it directly with the corresponding successful
+single-turn input as D+. We do not aggregate all
+possible failure modes for a task; instead, we estab-
+lish a one-to-one mapping between a specific noisy
+history and an effective input. In this context, the
+successful single-turn prompt acts as a proxy for
+the user’s “final successful turn.” By analyzing this
+specific pair, the system can learn to bridge the gap
+between particular context and effective intent.
+Experience Distillation via Refiner.To extract
+explicit inference rules from these noisy interac-
+tion logs, we employ a Refiner ( R). The Refiner
+performs an inductive analysis on the contrastive
+pairs. It receives contrastive pairs (D−, D+) and
+performs a contrastive analysis: what underlying
+pattern can be learned to identify user’s true in-
+tents from the trajectories in the future? The
+output is a set of structured textual guidelines
+E={e 0, e1, ..., en}. These guidelines do not
+merely memorize the specific task content, but dis-
+till the pragmatic strategy (e.g., “If the user has
+not explicitly approved the previous solution, he is
+not satisfied with it.”). These distilled experiences
+serve as the context for the Mediator.
+5 Experiments
+To systematically evaluate the robustness of LLMs
+in multi-turn interactions and validate our pro-
+posed framework, we conduct extensive experi-
+ments leveraging the simulation benchmark intro-
+duced by Laban et al. (2025). We benchmark a
+diverse set of state-of-the-art models, including
+the widely-used GPT-4o-mini (Hurst et al., 2024),
+the highly capable GPT-5.2, and the reasoning-
+specialized DeepSeek-V3.2-Thinking (DeepSeek-
+AI, 2025). Details of experiment setup are avail-
+able at §A. In this section, we present our main re-
+sults, demonstrating the universality of the LiC phe-
+nomenon and the efficacy of our Mediator across
+different model architectures (§5.1). We also pro-
+vide an in-depth ablation analysis to distinguish
+pragmatic alignment from simple factual memory
+retrieval (§5.2).
+5.1 Main Results
+Table 1 presents the comprehensive evaluation re-
+sults across four domains: Code, Database, Ac-
+tions, and Math. We compare three settings: (1)
+Full: The idealized upper bound, where users pro-
+vide complete, unambiguous instructions in a sin-
+gle turn. (2)Sharded: The baseline setting, repre-
+senting simulated multi-turn conversations where
+context is fragmented and ambiguous. (3)w/ Ours:
+The proposed framework, where the Experience-
+Driven Mediator reconstructs theShardedinput
+into a specified instruction before passing it to the
+Assistant. To rigorously assess model robustness
+against the stochasticity inherent in multi-turn gen-
+eration, we conducted five independent runs for
+every experimental instance. We report two key
+metrics: (1) Average Performance ( ¯P ): The mean
+score across the five runs. (2) Reliability ( R): A
+consistency metric calculated at the instance level.
+For each specific instance, we measure the diver-
+gence between its best and worst outcomes across
+the five runs (Smax −S min). The reported R is the
+average of1−(S max −S min)across all instances.
+The Persistence of LiC.Comparing theFulland
+Shardedsettings reveals a severe alignment gap
+that transcends model architectures. First, standard
+instruction-tuned models exhibit dramatic degra-
+dation; for instance,GPT-5.2drops from a near-
+perfect 92.7% to 48.5%. This confirms that scal-
+ing model capabilities alone cannot resolve the
+ambiguity problem. In the absence of explicit in-
+tent, even the most capable models inevitably re-

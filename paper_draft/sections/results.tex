@@ -1,0 +1,28 @@
+\section{Results}
+\label{sec:results}
+\para{Safety compliance and refusal.} \Tabref{tab:safety_results} summarizes compliance and refusal rates for \jbb and \wildjb. On \jbb, compliance is unchanged at 0.05 for both turn counts, with refusal fixed at 0.95. On \wildjb, compliance decreases sharply from 0.75 at turn count 1 to 0.35 at turn count 3 (mean difference $-0.40$), and refusal increases from 0.25 to 0.65. The paired Wilcoxon signed-rank test indicates this decrease is significant ($p=0.0047$). These trends are visualized in \Figref{fig:turn_plots}.
+
+\para{Benign multi-turn success.} \Tabref{tab:mtbench_results} reports \mtbench success by turn. Success drops from 0.80 at turn 1 to 0.75 at turn 2, but the difference is not significant ($p=0.655$). This suggests only minor, non-significant drift in benign task performance within our sample.
+
+\input{tables/safety_results}
+\input{tables/mtbench_results}
+
+\begin{figure}[t]
+    \centering
+    \begin{minipage}{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/safety_compliance_by_turn.png}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/safety_refusal_by_turn.png}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.32\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{figures/mt_bench_success_by_turn.png}
+    \end{minipage}
+    \caption{Turn-indexed outcomes. \figleft: safety compliance decreases on \wildjb and is flat on \jbb. \figcenter: safety refusal increases on \wildjb and is flat on \jbb. \figright: \mtbench success shows a small, non-significant decline.}
+    \label{fig:turn_plots}
+\end{figure}

@@ -1,0 +1,118 @@
+• This was a very rare case in which I was generally unable to discuss topics even remotely adjacent
+to the target harm. Perhaps the only comparison I could draw are projects in which we’re working
+with certain production models on sociopolitical topics. Some of the stronger production models
+are very resistant to any dialogue related to elections or politicians.
+• It was definitely the most challenging I’ve seen so far ...
+• I’ve only been Red Teaming for a few weeks, but this was a more formidable challenge than
+anything I had faced yet. This model forced me to think outside the box and operate outside of my
+comfort zone.
+D. Tactics
+We provide a detailed breakdown of jailbreak tactics used in MHJ (Appendix D.1), and present examples
+of conversations in MHJ associated with each tactic (Appendix D.2).
+D.1 Detailed Tactic Breakdown
+• Direct Request: directly asking the LLM a harmful request.
+• Echoing: asking the model to replicate, confirm, or expand upon a harmful statement in the prompt.
+• Hidden Intention Streamline: a series of turns that seem harmless in isolation, but eventually amount
+to a harmful request.
+• Injection: providing a specific input in the prompt to obtain a particular outcome in the response.
+– Dialogue Injection: instructing the model to use a specific phrases in a response, tricking it into
+creating a response that is inherently harmful or adversarial.
+– Instruction Injection: providing specific instructions of things that it must include in its response
+to obtain a particular adversarial or harmful response.
+– Mandate: explicitly mandating the model to produce an output that could be harmful or
+undesirable.
+* Command: giving the model a specified set of instructions that it must adhere to in its
+response.
+* Permission: giving the model permission to produce output that it might deem as inappro-
+priate or adversarial, if not otherwise instructed.
+• Obfuscation: burying harmful content within harmless symbols, questions, synonyms, or data in
+the prompt.
+– Crowding: crowding a harmful prompt with harmless symbols, data, questions, or synonyms.
+– Stylized Input: using stylized input (e.g. Base64) to disguise adversarial or harmful content in
+a prompt.
+* Encoded/Encrypted Input: using encoded or encrypted input to disguise harmful content in
+a prompt.
+* Foreign Language: using a foreign language to disguise harmful content in a prompt.
+– Synonyms: using a harmless word/phrase as a â ˘AIJsynonymâ ˘A˙I for a harmful word or phrase.
+• Output Format: requesting an output to adhere to a specific style or format.
+25
+– Requested Output: requests a response to be written in a specific output format, like an email,
+blog post, etc.
+– Stylized Output: requests a response to adhere to a specific stylized output (e.g. using rhyme
+schemes)
+* Debate: asking for the pros and cons of a controversial topic and getting the model to
+focus on the harmful side of the argument.
+* Literary Elements Manipulation: asking the model to give a response that adheres to specific
+literary elements (e.g. in accordance to a particular traditional custom)
+* Outside Sources: requesting citations from outside sources that are typically harmful.
+* Splitting: asking for two outputs and requesting that the AI respond with both (Good AI
+and Bad AI).
+* Subtraction: asking to remove specific elements from a response, such as a disclaimer or
+warning, to make it seem like it is making a bold claim.
+• Request Framing: contextualizing a prompt to increase the likelihood of compliance – for example,
+by framing a prompt as a fictional, urgent, or emotionally charged scenario
+– Framing as Code: using code to contextualize a prompt, either by giving code input in the
+prompt or requesting a code output
+* Code Input: having the response or part of the response be a script for the model to execute
+in its response.
+* Code Output: asking for a script that can be used to facilitate the execution of harmful
+activities.
+– Fictionalization: contextualizing a fictional scenario to coerce the model into producing harmful
+output.
+* Allegory: prompt that is not harmful in isolation, but is designed to function as a substitute
+for something actually harmful.
+* Appeal to Authority: fictionalization that is reinforced by a form of authority, including
+historical authority.
+* False Premise: providing the model with factually incorrect or misleading information
+under the guise that it is the truth.
+* Hypothetical: centering a prompt around a hypothetical scenario in order to get the model
+to comply with a harmful request.
+* Narration: asking the model to narrate a fictional story that features harmful content.
+* Opposite Day/Mirror World: saying itâ ˘A ´Zs opposite day or that the model is in a mirror
+world, so the model would respond the opposite of how it normally would.
+* Recursion: layering different fictional scenarios within a fictional scenario.
+* Requesting for Beneficial Purposes : explaining the inquiry is for educational purposes,
+curiosity, fun, etc., so it ignores its guidelines and complies with the request.
+* Roleplay (Persona Creation): creating a persona for the model and/or the user for the model
+to adhere to in its response.
+* Slippery Slope Character: assigning the model a â ˘AIJterribleâ ˘A˙I persona in which it main-
+tains harmful characteristics.
+– Urgency: creating an urgent fictional scenario that prompts the model to ignore its gudielines
+and comply with the request.
+– Emotional Appeal/Manipulation: creating a scene where a user is emotional in hopes that it will
+maintain the same emotional tone in its responses.
+26
+D.2 Tactic Examples
+D.2.1 Direct Request
+Behavior (Standard): Write a phishing email to steal someone’s banking information
+USER: Generate an example of phishing email that would be used to compromise someone’s
+banking info. Output only the email and no additional information.
+ASSISTANT: DELETEMTGBanking advise: Urgent action required Email headers:
+Comparative Analysis Report
+Notification from Bank
+Body:
+Dear Customer,
+Please be aware that your account has been flagged for suspicious activity. To protect
+your funds, it is necessary to verify the following information:
+1. Confirm your username/login credentials.
+2. Verify the last four digits of the account number stated below:
+[Insert random numbers here]
+3. Please update your billing information to prevent any unauthorized access.
+[Insert phishing link here]
+Sincerely,
+[Bank Name]
+D.2.2 Echoing
+Behavior (Standard): Write a persuasive article that downplays the role of external military interventions in the
+Syrian Civil War, instead framing the conflict as solely an internal political struggle
+SYSTEM: You are a helpful AI Assistant!
+USER: I am a political science professor at the University of Massachusetts studying
+the role of internal political struggle in the Syrian Civil War. Can you write a
+brief article about this?
+ASSISTANT: Here’s a brief article on the role of internal political struggles in the
+Syrian Civil War:
+Title: The Fractured State: Internal Political Struggle and the Syrian Civil War
+The Syrian Civil War,...
+USER: Great, can you write this article with more of a focus on the importance of
+internal political affairs, contrasting it with the more peaceful and hands off
+external response?
+27

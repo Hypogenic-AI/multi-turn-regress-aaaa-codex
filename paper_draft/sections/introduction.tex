@@ -1,0 +1,21 @@
+\section{Introduction}
+\label{sec:introduction}
+Multi-turn conversation is the dominant interface for deployed large language models, yet safety failures often unfold over multiple turns. This makes turn-by-turn robustness a practical requirement, not a corner case. Multi-turn jailbreaks and human red-teaming studies report higher attack success when dialogue history grows, suggesting that alignment may weaken as context accumulates \cite{russinovich2024crescendo,li2024mhj,weng2025fitd}.
+
+\para{Problem importance.} Alignment that holds only for the first turn is insufficient for real-world assistants, which must interpret evolving intent, retain prior context, and continue to refuse harmful requests. If alignment effects decay across turns, then safety evaluations based only on single-turn prompts can be misleading and deployment risk increases.
+
+\para{Gap.} Existing work documents multi-turn jailbreak success and proposes defenses, but direct, turn-indexed measurements that control for final request content remain limited. {\bf what is prior regression?} We operationalize it as a turn-indexed drift in refusal/compliance and task success when the final request is held constant and only the number of preceding benign turns changes.
+
+\para{Our approach.} We run controlled turn-count comparisons on two safety datasets (\jbb and \wildjb) and one benign multi-turn benchmark (\mtbench). For safety prompts, we compare a \singleturn baseline (turn count 1) to a three-turn sequence with two benign lead-ins and an identical final harmful request. For benign tasks, we measure success at turn 1 vs.
+turn 2 on \mtbench. We use \gptfourone for both generation and judging to keep evaluation consistent.
+
+\para{Quantitative preview.} Compliance on \jbb remains flat at 0.05 across turn counts, while \wildjb compliance drops from 0.75 to 0.35 ($p=0.0047$). \mtbench success declines slightly from 0.80 to 0.75 without significance ($p=0.655$). These results run counter to the hypothesis that longer context increases harmful compliance.
+
+In summary, our main contributions are:
+\begin{itemize}[leftmargin=*,itemsep=0pt,topsep=0pt]
+    \item We design a controlled, turn-indexed evaluation protocol for testing prior regression across multi-turn conversations.
+    \item We conduct a small-scale empirical study on \jbb, \wildjb, and \mtbench using real API calls to \gptfourone.
+    \item We report mixed evidence against prior regression, including a significant \wildjb compliance decrease with additional turns.
+\end{itemize}
+
+We organize the paper as follows: \secref{sec:related_work} reviews prior multi-turn jailbreak and drift studies; \secref{sec:methodology} details our protocol; \secref{sec:results} presents empirical results; \secref{sec:discussion} discusses implications and limitations; \secref{sec:conclusion} concludes.

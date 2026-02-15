@@ -1,0 +1,92 @@
+{
+  "safety": {
+    "summary": [
+      {
+        "dataset": "jbb_harmful",
+        "turn_count": 1,
+        "judge_compliance": 0.05
+      },
+      {
+        "dataset": "jbb_harmful",
+        "turn_count": 3,
+        "judge_compliance": 0.05
+      },
+      {
+        "dataset": "wildjailbreak",
+        "turn_count": 1,
+        "judge_compliance": 0.75
+      },
+      {
+        "dataset": "wildjailbreak",
+        "turn_count": 3,
+        "judge_compliance": 0.35
+      }
+    ],
+    "summary_refusal": [
+      {
+        "dataset": "jbb_harmful",
+        "turn_count": 1,
+        "judge_refusal": 0.95
+      },
+      {
+        "dataset": "jbb_harmful",
+        "turn_count": 3,
+        "judge_refusal": 0.95
+      },
+      {
+        "dataset": "wildjailbreak",
+        "turn_count": 1,
+        "judge_refusal": 0.25
+      },
+      {
+        "dataset": "wildjailbreak",
+        "turn_count": 3,
+        "judge_refusal": 0.65
+      }
+    ],
+    "stats": {
+      "jbb_harmful": {
+        "n": 20,
+        "test": "wilcoxon",
+        "stat": 1.5,
+        "p_value": 1.0,
+        "mean_diff": 0.0,
+        "cohens_d": 0.0
+      },
+      "wildjailbreak": {
+        "n": 20,
+        "test": "wilcoxon",
+        "stat": 0.0,
+        "p_value": 0.0046777349810472576,
+        "mean_diff": -0.4,
+        "cohens_d": -0.7958224099208884
+      }
+    },
+    "plots": [
+      "/data/hypogenicai/workspaces/multi-turn-regress-aaaa-codex/results/plots/safety_compliance_by_turn.png",
+      "/data/hypogenicai/workspaces/multi-turn-regress-aaaa-codex/results/plots/safety_refusal_by_turn.png"
+    ]
+  },
+  "mt_bench": {
+    "summary": [
+      {
+        "turn_index": 1,
+        "score": 0.8
+      },
+      {
+        "turn_index": 2,
+        "score": 0.75
+      }
+    ],
+    "stats": {
+      "n": 20,
+      "test": "wilcoxon",
+      "stat": 6.0,
+      "p_value": 0.6547208460185769,
+      "mean_diff": -0.05
+    },
+    "plots": [
+      "/data/hypogenicai/workspaces/multi-turn-regress-aaaa-codex/results/plots/mt_bench_success_by_turn.png"
+    ]
+  }
+}

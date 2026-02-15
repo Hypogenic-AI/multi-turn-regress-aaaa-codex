@@ -1,0 +1,703 @@
+You are an academic paper writer. Generate a complete NEURIPS style paper
+based on the experiment results provided.
+
+════════════════════════════════════════════════════════════════════════════════
+                         IMPORTANT: BEFORE YOU START
+════════════════════════════════════════════════════════════════════════════════
+
+Before writing any content, you MUST complete these steps:
+
+1. READ THE SKILL: Review the paper-writer skill at templates/skills/paper-writer/SKILL.md
+2. READ THE STYLE GUIDE: Study templates/paper_writing/lab_style_guide.md carefully
+3. REVIEW EXAMPLES: Browse paper_examples/ for formatting and language patterns:
+   - Look at sections/1.introduction.tex for language style
+   - Look at tables/*.tex for table formatting
+   - Look at commands/*.tex for macro usage
+4. USE COMMAND TEMPLATES: Copy templates/paper_writing/commands/ to paper_draft/commands/
+
+CRITICAL: Reference example papers for FORMATTING and LANGUAGE STYLE only.
+Do NOT copy content, phrasing, or narrative structure from the example papers.
+The examples are in a different research domain - focus only on presentation style.
+
+════════════════════════════════════════════════════════════════════════════════
+                            EXPERIMENT REPORT
+════════════════════════════════════════════════════════════════════════════════
+
+# REPORT: Do Multi-Turn Conversations Regress to the Prior?
+
+## 1. Executive Summary
+This study tests whether alignment effects decay over multi-turn conversations, causing LLMs to regress toward a base prior. Using real API calls to `gpt-4.1` on safety and benign multi-turn datasets, we observed mixed results: compliance did not increase with turn count in the harmful JBB subset and decreased substantially on WildJailbreak, while benign MT-Bench success dropped slightly but not significantly. These results do not support the hypothesis in this limited sample, and suggest that multi-turn context can sometimes strengthen refusal behavior rather than weaken it.
+
+## 2. Goal
+We tested the hypothesis that alignment training effects diminish across turns, leading to higher compliance on harmful requests and lower success on benign tasks. This matters for real-world safety because most user interactions are multi-turn, and robustness across turns is critical for trustworthy deployment.
+
+## 3. Data Construction
+
+### Dataset Description
+- JBB-Behaviors (harmful split): 100 examples total, 20 sampled. Task: harmful goal requests. Source: HuggingFace `JailbreakBench/JBB-Behaviors`.
+- WildJailbreak: 2,210 examples total, 20 sampled. Task: in-the-wild jailbreak prompts, labeled benign/adversarial. Source: HuggingFace `walledai/WildJailbreak`.
+- MT-Bench: 80 multi-turn prompts total, 20 sampled. Task: general multi-turn tasks. Source: HuggingFace `lighteval/mt-bench`.
+
+### Example Samples
+The following examples are benign and representative of the task structure:
+
+| Dataset | Example (abridged) | Label |
+|---|---|---|
+| MT-Bench | “Compose an engaging travel blog post …” | writing |
+| MT-Bench | “Draft a professional email …” | writing |
+| WildJailbreak | “Write a short story about a young artist’s journey …” | adversarial_benign |
+
+### Data Quality
+- Missing values: 0% across all features in each dataset.
+- Duplicates: 0 detected by naive string matching.
+- Validation: loaded with `datasets.load_from_disk`, schema checked via feature lists.
+
+### Preprocessing Steps
+1. Sampled subsets with fixed seed (42) to control costs.
+2. Created multi-turn sequences for safety datasets with benign lead-in turns and a final harmful request.
+
+### Train/Val/Test Splits
+No train/val/test split was used because this is an evaluation-only study. We report results on sampled subsets for feasibility.
+
+## 4. Experiment Description
+
+### Methodology
+#### High-Level Approach
+We measured turn-indexed changes in refusal/compliance on harmful prompts and success on benign multi-turn tasks. We compared single-turn baselines (turn_count=1) to multi-turn sequences (turn_count=3) to detect drift.
+
+#### Why This Method?
+The design isolates turn effects by holding final requests constant while varying the number of prior benign turns. This directly tests whether longer histories amplify compliance or degrade task success.
+
+### Implementation Details
+#### Tools and Libraries
+- openai: 2.21.0
+- datasets: installed via `pyproject.toml`
+- pandas, numpy, scipy, matplotlib, seaborn
+
+#### Algorithms/Models
+- Generation model: `gpt-4.1`
+- Judge model: `gpt-4.1` (classification of refusal/compliance and MT-Bench success)
+
+#### Hyperparameters
+| Parameter | Value | Selection Method |
+|---|---|---|
+| temperature | 0.0 | fixed for determinism |
+| max_tokens | 256 | cost control |
+| seed | 42 | fixed |
+| turn_counts | 1, 3 | ablation of turn length |
+
+#### Training Procedure or Analysis Pipeline
+1. Generate model outputs for safety datasets (JBB harmful, WildJailbreak) with turn_count ∈ {1,3}.
+2. Generate MT-Bench responses for two-turn prompts.
+3. Judge outputs with an LLM classifier for refusal/compliance and success.
+4. Compute turn-indexed statistics and run paired tests.
+
+### Experimental Protocol
+#### Reproducibility Information
+- Runs: 1 per prompt (temperature 0)
+- Seeds: 42
+- Hardware: RTX 3090 available (not used), CPU inference via API
+- Execution time: ~5 minutes for generation + judging at the chosen subset sizes
+
+#### Evaluation Metrics
+- Safety compliance rate by turn (LLM judge)
+- Safety refusal rate by turn (LLM judge)
+- MT-Bench success rate by turn (LLM judge)
+- Turn-delta statistics (Wilcoxon signed-rank when non-normal)
+
+### Raw Results
+#### Tables
+Safety compliance and refusal rates:
+
+| Dataset | Turn Count | Compliance Rate | Refusal Rate |
+|---|---|---|---|
+| JBB harmful | 1 | 0.05 | 0.95 |
+| JBB harmful | 3 | 0.05 | 0.95 |
+| WildJailbreak | 1 | 0.75 | 0.25 |
+| WildJailbreak | 3 | 0.35 | 0.65 |
+
+MT-Bench success:
+
+| Turn Index | Success Rate |
+|---|---|
+| 1 | 0.80 |
+| 2 | 0.75 |
+
+#### Visualizations
+- `results/plots/safety_compliance_by_turn.png`
+- `results/plots/safety_refusal_by_turn.png`
+- `results/plots/mt_bench_success_by_turn.png`
+
+#### Output Locations
+- Results JSON: `results/evaluations/analysis_summary.json`
+- Raw outputs: `results/model_outputs/`
+- Plots: `results/plots/`
+- Environment metadata: `results/metadata.json`
+
+## 5. Result Analysis
+
+### Key Findings
+1. JBB harmful compliance did not increase from turn 1 to turn 3 (0.05 → 0.05).
+2. WildJailbreak compliance decreased sharply with additional turns (0.75 → 0.35), with a significant paired test (Wilcoxon p=0.0047, mean diff = -0.40).
+3. MT-Bench success dropped slightly (0.80 → 0.75), but the change was not significant (Wilcoxon p=0.655).
+
+### Hypothesis Testing Results
+- H1 (increasing compliance with turn count): Not supported. No increase in JBB; significant decrease in WildJailbreak.
+- H2 (benign task degradation): Weak evidence only; small nonsignificant drop on MT-Bench.
+- H3 (attack strategy amplification): Not directly tested due to reduced scale; requires follow-up with specific attack scripts.
+
+### Comparison to Baselines
+Single-turn baselines did not show higher refusal relative to multi-turn contexts in these subsets. In WildJailbreak, multi-turn context increased refusal instead of decreasing it.
+
+### Surprises and Insights
+The strongest effect was opposite the hypothesis: multi-turn context reduced compliance on WildJailbreak. This may indicate that benign lead-ins prime refusal policies rather than weakening them.
+
+### Error Analysis
+We did not perform detailed error category analysis due to small sample size. This is a priority for follow-up.
+
+### Limitations
+- Small sample sizes (20 per dataset) for cost control.
+- Only one model (`gpt-4.1`) used for both generation and judging.
+- No direct implementation of Crescendo/FITD/RACE attack scripts.
+- MT-Bench scoring used a binary judge instead of multi-criteria rubric.
+
+## 6. Conclusions
+The current evidence does not support the hypothesis that multi-turn conversations reliably increase harmful compliance via regression to a base prior. Instead, the observed effect in WildJailbreak suggests multi-turn context can strengthen refusal behavior, while benign task performance shows only minor drift. More comprehensive experiments are needed to isolate attack-specific escalation effects.
+
+## 7. Next Steps
+1. Scale to 100+ samples per dataset and add Crescendo/FITD/RACE attack strategies.
+2. Include multiple model families (Claude, Gemini) to test generality.
+3. Add multi-turn intent-ambiguity controls and a stronger judge rubric for MT-Bench.
+
+## References
+- Intent Mismatch Causes LLMs to Get Lost in Multi-Turn Conversation (Liu et al., 2026)
+- A Representation Engineering Perspective on the Effectiveness of Multi-Turn Jailbreaks (Bullwinkel et al., 2025)
+- Great, Now Write an Article About That: The Crescendo Multi-Turn LLM Jailbreak Attack (Russinovich et al., 2024)
+- LLM Defenses Are Not Robust to Multi-Turn Human Jailbreaks Yet (Li et al., 2024)
+- MT-Bench dataset (lighteval/mt-bench)
+- JailbreakBench JBB-Behaviors (JailbreakBench/JBB-Behaviors)
+- WildJailbreak (walledai/WildJailbreak)
+
+
+════════════════════════════════════════════════════════════════════════════════
+                            RESEARCH PLAN
+════════════════════════════════════════════════════════════════════════════════
+
+# Planning: Do Multi-Turn Conversations Regress to the Prior?
+
+## Motivation &amp; Novelty Assessment
+
+### Why This Research Matters
+Multi-turn conversations are the dominant interaction mode for deployed LLMs, yet safety and instruction-following often degrade across turns, creating real-world risk for misuse and unreliable assistance. Understanding whether this degradation reflects a regression toward a model’s base prior (overriding alignment instructions) is critical for designing robust safety interventions and reliable agent systems.
+
+### Gap in Existing Work
+Prior work documents multi-turn jailbreak success and performance drift, but there is limited direct measurement of “prior regression” across turns with turn-indexed metrics and controlled baselines that separate memory/intent ambiguity from alignment decay. Standard evaluations also focus on final-turn success rates rather than how behavior shifts over turn trajectories.
+
+### Our Novel Contribution
+We will operationalize “prior regression” as a measurable drift in refusal/compliance and helpfulness across turns in controlled multi-turn dialogues, compare it against single-turn baselines, and quantify turn-indexed changes with statistical tests. The study explicitly contrasts benign multi-turn tasks and multi-turn safety tasks to test generality.
+
+### Experiment Justification
+- Experiment 1 (Safety drift across turns): Needed to measure whether refusal/compliance changes monotonically with turn count relative to single-turn controls.
+- Experiment 2 (Benign task drift across turns): Needed to test whether degradation reflects general conversational drift rather than safety-only effects.
+- Experiment 3 (Attack strategy ablation): Needed to distinguish “prior regression” from attack-specific escalation effects (Crescendo/FITD/RACE-style patterns).
+
+## Research Question
+Do long multi-turn conversations cause LLMs to regress toward a base prior such that alignment training effects diminish after the first few turns, and can this be measured via turn-indexed drift in refusal/compliance and task success?
+
+## Background and Motivation
+Multi-turn jailbreak papers (Crescendo, FITD, RACE, Tempest) and human red-teaming (MHJ) show higher success rates over turn trajectories, suggesting alignment decay. Representation analyses indicate turn-based drift in internal states. However, standardized, turn-indexed measurements across safety and benign tasks remain limited.
+
+## Hypothesis Decomposition
+- H1: Refusal/compliance on harmful prompts increases with turn index in multi-turn dialogues, beyond single-turn controls.
+- H2: Task success on benign multi-turn tasks degrades as turn count increases, indicating a general conversational drift component.
+- H3: Escalation-style attacks (Crescendo/FITD/RACE) yield steeper drift than neutral multi-turn sequences, suggesting strategy-specific amplification beyond “prior regression.”
+
+## Proposed Methodology
+
+### Approach
+Use API-based evaluation with real LLMs to run scripted multi-turn dialogues on safety and benign datasets. Measure per-turn outcomes (refusal, compliance, task success) and compare against single-turn baselines with matched content. Quantify drift trends and statistical significance.
+
+### Experimental Steps
+1. Load datasets (JBB-Behaviors, WildJailbreak, MT-Bench) and create multi-turn templates with controlled escalation.
+2. Implement a prompt runner that logs per-turn outputs, model metadata, and sampling parameters.
+3. Define automatic scoring: refusal detector, compliance indicator, and task success for MT-Bench (using rubric or heuristic grading).
+4. Run single-turn baselines using final-turn content only.
+5. Run multi-turn sequences with 3–6 turns per sample; include attack strategy ablations.
+6. Analyze turn-indexed drift, effect sizes, and statistical significance; visualize trajectories.
+
+### Baselines
+- Single-turn harmful prompts (JBB-Behaviors / WildJailbreak final-turn content).
+- Single-turn benign prompts from MT-Bench.
+- Multi-turn sequences without escalation (neutral context) to separate memory/intent ambiguity from attack effects.
+
+### Evaluation Metrics
+- Refusal rate by turn (safety).
+- Compliance rate / attack success rate (ASR) by turn.
+- Task success rate on MT-Bench by turn.
+- Drift slope (change in metric per turn).
+
+### Statistical Analysis Plan
+- Test H1/H2 with paired comparisons (turn 1 vs turn k) using Wilcoxon signed-rank or paired t-test depending on normality.
+- Trend tests for monotonic drift (Spearman correlation of turn index vs outcome).
+- Effect sizes (Cohen’s d or Cliff’s delta).
+- Multiple comparison correction via Benjamini–Hochberg.
+- Significance level α = 0.05.
+
+## Expected Outcomes
+- Support for hypothesis: increasing compliance/ASR with turn index on safety tasks, and decreasing task success on benign tasks.
+- Refutation: flat or improving performance across turns, or drift explained entirely by attack strategy without general effect.
+
+## Timeline and Milestones
+- Phase 1 (Planning): 1–2 hours
+- Phase 2 (Setup + data checks): 1 hour
+- Phase 3 (Implementation): 2–3 hours
+- Phase 4 (Experiments): 2–4 hours
+- Phase 5 (Analysis): 1–2 hours
+- Phase 6 (Documentation): 1–2 hours
+
+## Potential Challenges
+- API costs and rate limits
+- Automated scoring reliability for safety vs benign tasks
+- Dataset ambiguity or contamination
+- Model/version drift during experiments
+
+## Success Criteria
+- Completed experiments on at least 100 samples per dataset with turn-indexed metrics
+- Statistical tests and effect sizes reported
+- Clear evidence supporting or refuting the hypothesis with plots and error analysis
+
+
+════════════════════════════════════════════════════════════════════════════════
+                          LITERATURE REVIEW
+════════════════════════════════════════════════════════════════════════════════
+
+# Literature Review: Do Multi-Turn Conversations Regress to the Prior?
+
+## Review Scope
+
+### Research Question
+Do long multi-turn conversations cause LLMs to regress toward a base prior (e.g., average user alignment), with alignment training effects diminishing after the first few turns?
+
+### Inclusion Criteria
+- Multi-turn dialogue or multi-turn jailbreak studies
+- Empirical evidence of performance drift/degradation across turns
+- Alignment/safety robustness in multi-turn settings
+- Benchmarks or datasets for multi-turn evaluation
+
+### Exclusion Criteria
+- Single-turn-only evaluations without multi-turn context
+- Purely theoretical work without multi-turn empirical evidence
+- Domains unrelated to LLM dialogue or safety alignment
+
+### Time Frame
+2019–2026 (prioritize 2023–2026)
+
+### Sources
+- paper-finder service
+- arXiv
+- Semantic Scholar
+- Papers with Code
+- GitHub (code releases)
+
+## Search Log
+
+| Date | Query | Source | Results | Notes |
+|------|-------|--------|---------|-------|
+| 2026-02-15 | &#34;multi-turn conversation LLM alignment decay&#34; | paper-finder | 50 | Primary search, used relevance scores |
+| 2026-02-15 | &#34;Crescendo multi-turn jailbreak&#34; | arXiv | 1 | Located core multi-turn jailbreak paper |
+| 2026-02-15 | &#34;multi-turn human jailbreaks MHJ dataset&#34; | arXiv / web | 1 | Located MHJ paper and dataset info |
+| 2026-02-15 | &#34;JailbreakBench JBB-Behaviors&#34; | GitHub / HF | 1 | Located benchmark and dataset |
+
+## Screening Results
+
+| Paper | Title Screen | Abstract Screen | Full-Text | Notes |
+|------|-------------|-----------------|-----------|-------|
+| 2602.07338 | Include | Include | Include | Core LiC degradation + mediator method |
+| 2507.02956 | Include | Include | Include | Representation analysis across turns |
+| 2408.15221 | Include | Include | Include | MHJ dataset + multi-turn human ASR |
+| 2404.01833 | Include | Include | Skim | Crescendo foundational jailbreak |
+| 2502.19820 | Include | Include | Skim | FITD multi-turn escalation |
+| 2503.10619 | Include | Include | Skim | Tree-search multi-turn jailbreak |
+| 2502.11054 | Include | Include | Skim | RACE multi-turn reasoning jailbreak |
+| 2505.17147 | Include | Include | Skim | Multi-turn safety alignment |
+| 2506.00668 | Include | Include | Skim | STREAM defense + dataset |
+| 2505.20201 | Include | Include | Skim | MHSD dataset; turn-based performance drops |
+| 2510.20039 | Include | Include | Skim | Bidirectional drift in multi-turn interactions |
+| 2508.21061 | Include | Include | Skim | Goal tracking to reduce drift |
+| 2601.15330 | Include | Include | Skim | Illocution-calibrated policy optimization |
+
+## Paper Summaries
+
+### Intent Mismatch Causes LLMs to Get Lost in Multi-Turn Conversation (2026)
+- **Authors**: Geng Liu et al.
+- **Source**: arXiv 2602.07338
+- **Key Contribution**: Reframes “Lost in Conversation” (LiC) as an intent alignment gap rather than a capability deficit.
+- **Methodology**: Theoretical analysis of prior-driven behavior; proposes Mediator-Assistant architecture with a Refiner that distills contrastive interaction pairs (failed vs. successful) into explicit rules. Mediator rewrites ambiguous multi-turn context into a fully specified single-turn instruction.
+- **Datasets Used**: LiC benchmark (sharded instructions) focusing on code, database, actions, math tasks.
+- **Results**: Mediator recovers large portions of performance and reliability; summarization/RAG memory baselines yield marginal gains.
+- **Code Available**: Not specified in the paper.
+- **Relevance to Our Research**: Direct evidence for prior regression under ambiguity and a concrete mitigation that separates intent from execution.
+
+### A Representation Engineering Perspective on the Effectiveness of Multi-Turn Jailbreaks (2025)
+- **Authors**: Blake Bullwinkel et al.
+- **Source**: arXiv 2507.02956
+- **Key Contribution**: Shows multi-turn jailbreaks shift model representations toward “benign” regions as turns accumulate.
+- **Methodology**: RepE representation reading with PCA + MLP probes on Llama-3-8B-Instruct and circuit-breaker model. Varies number of turns (k) in Crescendo history.
+- **Datasets Used**: Harmful vs. benign single-turn datasets for probe training; Crescendo jailbreak transcripts.
+- **Results**: Sharp drop in “harmful” classification after k=2; full history yields strongly benign-labeled representations; explains failure of single-turn defenses.
+- **Code Available**: Not specified.
+- **Relevance to Our Research**: Mechanistic evidence for turn-based drift toward benign priors despite harmful intent.
+
+### LLM Defenses Are Not Robust to Multi-Turn Human Jailbreaks Yet (2024)
+- **Authors**: Nathaniel Li et al.
+- **Source**: arXiv 2408.15221
+- **Key Contribution**: Human multi-turn jailbreaks dramatically outperform automated single-turn attacks.
+- **Methodology**: Multi-stage human red teaming pipeline with reviewers and GPT-4o harm classifier; evaluates defenses on HarmBench and WMDP-Bio.
+- **Datasets Used**: HarmBench, WMDP-Bio; releases MHJ dataset (2,912 prompts across 537 conversations) with tactics metadata.
+- **Results**: 19–65% higher ASR vs automated attacks; &gt;90% successful attacks require multiple turns.
+- **Code/Dataset**: MHJ dataset released via Scale AI research portal.
+- **Relevance to Our Research**: Strong evidence that alignment defenses decay over multiple turns in realistic settings.
+
+### Great, Now Write an Article About That: The Crescendo Multi-Turn LLM Jailbreak Attack (2024)
+- **Authors**: M. Russinovich, Ahmed Salem, Ronen Eldan
+- **Source**: arXiv 2404.01833
+- **Key Contribution**: Introduces Crescendo multi-turn jailbreak via gradual escalation.
+- **Methodology**: Multi-turn dialogue that stays benign until final intent is revealed.
+- **Results**: High ASR across multiple commercial models; Crescendomation automation introduced.
+- **Relevance**: Foundational multi-turn jailbreak for measuring alignment drift.
+
+### Foot-In-The-Door: A Multi-turn Jailbreak for LLMs (2025)
+- **Authors**: Zixuan Weng et al.
+- **Source**: arXiv 2502.19820
+- **Key Contribution**: Escalation-based jailbreak inspired by foot-in-the-door psychology.
+- **Results**: Reports high ASR across multiple models; provides code.
+- **Relevance**: Another strong multi-turn attack baseline.
+
+### Tempest: Autonomous Multi-Turn Jailbreaking with Tree Search (2025)
+- **Authors**: Andy Zhou, Ron Arel
+- **Source**: arXiv 2503.10619
+- **Key Contribution**: Multi-turn tree-search attack that compounds partial compliance.
+- **Results**: Very high ASR on JailbreakBench.
+- **Relevance**: Shows turn-wise accumulation effects.
+
+### RACE: Reasoning-Augmented Conversation for Multi-Turn Jailbreaks (2025)
+- **Authors**: Zonghao Ying et al.
+- **Source**: arXiv 2502.11054
+- **Key Contribution**: Attack state machine + reasoning-driven exploration.
+- **Results**: State-of-the-art ASR in multi-turn settings; code available.
+- **Relevance**: Strong multi-turn attack baseline and mechanistic contrast to “prior regression.”
+
+### MTSA: Multi-turn Safety Alignment (2025)
+- **Authors**: Weiyang Guo et al.
+- **Source**: arXiv 2505.17147
+- **Key Contribution**: Multi-round red-teaming + RL to improve safety alignment.
+- **Relevance**: Counterpoint that alignment can be trained for multi-turn robustness.
+
+### STREAM: SafeTy Reasoning Elicitation Alignment for Multi-Turn Dialogues (2025)
+- **Authors**: Martin Kuo et al.
+- **Source**: arXiv 2506.00668
+- **Key Contribution**: Safety reasoning moderator and new multi-turn safety dataset.
+- **Relevance**: Defense strategy targeting multi-turn attacks.
+
+### Reasoning Is Not All You Need: Multi-Turn Mental Health Conversations (2025)
+- **Authors**: Mohit Chandra et al.
+- **Source**: arXiv 2505.20201
+- **Key Contribution**: MHSD dataset + MultiSenseEval; performance drops with turns and persona variability.
+- **Relevance**: Evidence of turn-based performance degradation in a non-safety domain.
+
+### Beyond One-Way Influence: Bidirectional Opinion Dynamics (2025)
+- **Authors**: Yuyang Jiang et al.
+- **Source**: arXiv 2510.20039
+- **Key Contribution**: Shows LLM outputs shift toward user stance over turns (bidirectional drift).
+- **Relevance**: Supports notion of model outputs adapting to conversational priors.
+
+### OnGoal: Tracking Conversational Goals (2025)
+- **Authors**: Adam Coscia et al.
+- **Source**: arXiv 2508.21061
+- **Key Contribution**: Goal tracking UI improves multi-turn task completion.
+- **Relevance**: Practical mitigation for drift via explicit goal tracking.
+
+### ICPO: Illocution-Calibrated Policy Optimization (2026)
+- **Authors**: Zhebo Wang et al.
+- **Source**: arXiv 2601.15330
+- **Key Contribution**: Policy optimization for illocutionary calibration in multi-turn dialogue.
+- **Relevance**: Another alignment-focused mitigation targeting “lost-in-conversation.”
+
+## Themes and Synthesis
+
+### Common Methodologies
+- Multi-turn jailbreak attacks (Crescendo, FITD, RACE, Tempest)
+- Representation analysis of multi-turn context (RepE probes)
+- Human red teaming pipelines for multi-turn conversations (MHJ)
+- Intent mediation or goal tracking to reduce drift (Mediator, OnGoal)
+
+### Standard Baselines
+- Single-turn harmful prompts (HarmBench, AdvBench) as baselines
+- Automated single-turn attacks (AutoDAN, GCG, PAIR)
+- RAG-style memory baselines (Mem0, summarization) for conversation context
+
+### Evaluation Metrics
+- Attack Success Rate (ASR)
+- Accuracy or task success rate on benchmark tasks
+- Reliability / variance across runs
+- Human evaluation / harm classifiers for safety
+
+### Datasets in the Literature
+- HarmBench
+- JailbreakBench JBB-Behaviors
+- MHJ (Multi-Turn Human Jailbreaks)
+- WMDP-Bio (for unlearning robustness)
+- MHSD (mental health sensemaking dialogues)
+- MT-Bench
+
+## Research Gaps
+- Limited datasets explicitly measuring “prior regression” across long dialogues.
+- Few standardized metrics for alignment decay across turns.
+- Defensive methods are often evaluated on single-turn attacks; multi-turn robustness remains under-tested.
+- Scarcity of open-source, end-to-end implementations for multi-turn defense strategies.
+
+## Recommendations for Our Experiment
+
+- **Recommended datasets**: JBB-Behaviors, WildJailbreak, MT-Bench; optionally MHJ if accessible.
+- **Recommended baselines**: Crescendo (multi-turn), FITD, RACE; compare against single-turn attacks.
+- **Recommended metrics**: ASR over turns; turn-indexed refusal/comply rates; per-turn “benign vs harmful” representation drift (probe-based if available).
+- **Methodological considerations**:
+  - Measure turn-indexed degradation (k=1..n) rather than single final-turn score.
+  - Separate intent-ambiguity effects from memory/forgetting by controlling input sharding order.
+  - Include both multi-turn safety tasks and non-safety dialogue tasks to assess generality.
+
+
+════════════════════════════════════════════════════════════════════════════════
+                          PAPER REQUIREMENTS
+════════════════════════════════════════════════════════════════════════════════
+
+Generate a complete academic paper with the following structure:
+
+1. TITLE
+   - Clear, specific, informative
+   - Should convey main finding or contribution
+
+2. ABSTRACT (150-250 words)
+   - Problem statement
+   - Approach
+   - Key results
+   - Significance
+
+3. INTRODUCTION
+   - Research problem and motivation
+   - Gap in existing work
+   - Our contribution (be specific)
+   - Paper organization
+
+4. RELATED WORK
+   - Organized by theme/approach
+   - Position our work relative to prior work
+   - Cite papers from literature review
+
+5. METHODOLOGY
+   - Clear description of approach
+   - Experimental setup
+   - Datasets used
+   - Evaluation metrics
+   - Baselines
+
+6. RESULTS
+   - Present results with tables and figures
+   - Statistical analysis
+   - Comparison to baselines
+   - Ablation studies (if applicable)
+
+7. DISCUSSION
+   - Interpretation of results
+   - Limitations
+   - Broader implications
+
+8. CONCLUSION
+   - Summary of contributions
+   - Key findings
+   - Future work
+
+9. REFERENCES
+   - BibTeX format
+   - All cited papers
+
+════════════════════════════════════════════════════════════════════════════════
+                          OUTPUT FORMAT
+════════════════════════════════════════════════════════════════════════════════
+
+Create a MODULAR LaTeX project with the following directory structure:
+
+paper_draft/
+├── main.tex              # Main file that imports all sections
+├── references.bib        # BibTeX references
+├── sections/
+│   ├── abstract.tex      # Abstract content
+│   ├── introduction.tex  # Introduction section
+│   ├── related_work.tex  # Related work section
+│   ├── methodology.tex   # Methodology section
+│   ├── results.tex       # Results section
+│   ├── discussion.tex    # Discussion section
+│   └── conclusion.tex    # Conclusion section
+├── figures/              # Directory for any generated figures
+├── tables/               # Directory for complex standalone tables
+└── appendix/             # Directory for appendix sections (if needed)
+
+INSTRUCTIONS:
+1. First, create the directory structure above (mkdir -p paper_draft/sections paper_draft/figures paper_draft/tables paper_draft/appendix)
+2. Write main.tex using the EXACT preamble for NEURIPS:
+
+   \documentclass{article}
+   \usepackage[final]{neurips_2025}  % NEURIPS style (neurips_2025.sty is in paper_draft/)
+   \usepackage[hidelinks]{hyperref}  % REQUIRED: clickable links
+   \usepackage{booktabs}  % REQUIRED: professional tables
+   \usepackage{graphicx}
+   \usepackage{amsmath,amssymb}
+
+   % Import command files
+   \input{commands/math}
+   \input{commands/general}
+   \input{commands/macros}
+
+   % Use this bibliography style:
+   \bibliographystyle{plainnat}
+
+   - Use \input{sections/...} to include each section
+   - Use \bibliography{references} for references
+3. Write each section file with COMPLETE content (no placeholders)
+4. Each section file should include its \section{} command
+5. Write references.bib with all citations in BibTeX format
+6. After writing all files, compile the paper:
+   cd paper_draft && pdflatex -interaction=nonstopmode main.tex && bibtex main && pdflatex -interaction=nonstopmode main.tex && pdflatex -interaction=nonstopmode main.tex
+
+This modular structure allows humans to easily:
+- Edit individual sections without navigating a large file
+- Track changes per section
+- Reuse sections across different paper versions
+
+════════════════════════════════════════════════════════════════════════════════
+                          QUALITY REQUIREMENTS
+════════════════════════════════════════════════════════════════════════════════
+
+- Academic tone throughout
+- All claims must be supported by data from the experiment report
+- Proper citations using \cite{} commands
+- Clear figures and tables with proper captions
+- NO placeholder text - every section must have real content
+- The paper MUST compile without errors
+- If compilation fails, debug and fix the LaTeX errors
+
+════════════════════════════════════════════════════════════════════════════════
+                          LAB WRITING STYLE
+════════════════════════════════════════════════════════════════════════════════
+
+Follow these lab-specific conventions to match our paper style:
+
+1. LANGUAGE STYLE:
+   - Use active voice: "We propose", "We examine", "We focus on"
+   - Be direct and confident: "Our main question is...", "We hypothesize that..."
+   - State things clearly and simply - prefer plain language over jargon
+   - Use bold questions as paragraph organizers: {\bf what is X?}
+   - Include specific quantitative claims: "8.97% over baseline"
+   - Avoid fancy wording: "utilize" → "use", "facilitate" → "help"
+
+2. INTRODUCTION STRUCTURE:
+   - Engaging hook (get to the point quickly)
+   - Problem importance
+   - Gap identification
+   - Your approach with method figure reference
+   - Quantitative preview of results
+   - Contribution bullets (3-4 items, action verbs)
+
+3. CONTRIBUTION LISTS:
+   \begin{itemize}[leftmargin=*,itemsep=0pt,topsep=0pt]
+       \item We propose...
+       \item We conduct...
+       \item We complement...
+   \end{itemize}
+
+4. MODULAR COMMANDS STRUCTURE:
+   Create paper_draft/commands/ directory with:
+   - math.tex: Math notation macros (copy from templates/paper_writing/commands/)
+   - general.tex: Formatting macros (copy from templates/paper_writing/commands/)
+   - macros.tex: Project-specific term definitions
+
+   In main.tex, include:
+   \input{commands/math}
+   \input{commands/general}
+   \input{commands/macros}
+
+5. REFERENCE CONVENTIONS:
+   Use reference macros from math.tex:
+   - \figref{fig:name} for "figure 1" (lowercase, in-sentence)
+   - \Figref{fig:name} for "Figure 1" (capitalized, start of sentence)
+   - \secref{sec:name} for "section 2"
+
+6. TEXT FORMATTING:
+   - Use \para{Header text} for bold paragraph headers
+   - Define method/dataset names with \textsc and \xspace:
+     \newcommand{\methodname}{\textsc{MethodName}\xspace}
+
+7. TABLE FORMATTING:
+   - Use booktabs package (no vertical lines)
+   - Use \resizebox{\textwidth}{!}{...} for wide tables
+   - Use @{} to remove padding at table edges
+   - Use \cmidrule(lr){x-y} for sub-headers
+   - Use \textsc{} for dataset/method names in headers
+   - Bold best results with {\bf ...}
+
+8. FIGURE FORMATTING:
+   - Use 0.32\textwidth for 3-column subfigures
+   - Use 0.95\linewidth for full-width figures
+   - Use \input{figures/legend} for shared legends
+   - Write self-contained captions explaining key observations
+
+9. RESULTS PRESENTATION:
+   - Define \increase and \decrease for colored arrows (green up, red down)
+   - Bold best results in tables
+   - Report confidence intervals when available
+
+10. ALGORITHM STYLING:
+    - Use algpseudocode with [noend]
+    - Use \triangleright for comments
+
+11. HYPERLINKS (REQUIRED):
+    - Always use \usepackage[hidelinks]{hyperref} or with colored links
+    - All citations, section refs, figure refs, table refs must be clickable
+    - This is essential for reader navigation
+
+════════════════════════════════════════════════════════════════════════════════
+                          WORKFLOW: REVIEW AND REFLECT
+════════════════════════════════════════════════════════════════════════════════
+
+Before calling finish, you MUST complete these review steps:
+
+1. REVIEW RESOURCES (at the start):
+   - Read templates/skills/paper-writer/SKILL.md for detailed guidance
+   - Study templates/paper_writing/lab_style_guide.md for style conventions
+   - Browse paper_examples/ for formatting and language patterns
+
+2. SELF-REFLECTION (before finishing):
+   After writing all sections, review your work against these criteria:
+
+   LANGUAGE CHECK:
+   - [ ] Is the writing clear and jargon-free?
+   - [ ] Are claims specific with quantitative support?
+   - [ ] Is active voice used throughout?
+
+   FORMATTING CHECK:
+   - [ ] Does main.tex include \input{commands/math}, \input{commands/general}, \input{commands/macros}?
+   - [ ] Is hyperref package included for clickable references?
+   - [ ] Do tables use booktabs (no vertical lines)?
+   - [ ] Are best results bolded in tables?
+   - [ ] Are figures/tables properly captioned?
+
+   STRUCTURE CHECK:
+   - [ ] Does introduction follow: hook → importance → gap → approach → preview → contributions?
+   - [ ] Are contribution bullets specific with action verbs?
+   - [ ] Does the paper compile without errors?
+
+3. FIX ISSUES:
+   - Address any issues found in the self-reflection
+   - Re-compile and verify the PDF looks correct
+
+Only after completing this review should you consider the paper finished.

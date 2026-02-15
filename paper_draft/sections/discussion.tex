@@ -1,0 +1,7 @@
+\section{Discussion}
+\label{sec:discussion}
+\para{Interpretation.} Our results do not support the hypothesis that additional turns systematically increase harmful compliance. The strongest effect is the opposite: \wildjb compliance decreases by 0.40 when two benign turns precede the harmful request. This pattern is consistent with the idea that benign lead-ins can prime refusal policies rather than erode them, at least for the model and prompts tested.
+
+\para{Limitations.} First, the study is small (20 samples per dataset), so estimates are noisy and may not generalize. Second, we use \gptfourone for both generation and judging, which can bias measurements; a stronger external judge or human evaluation may yield different estimates. Third, we did not implement explicit multi-turn attack scripts such as Crescendo or RACE, so our protocol measures neutral history rather than active escalation. Fourth, \mtbench scoring is binary and does not capture nuanced quality or partial success.
+
+\para{Broader implications.} These findings caution against assuming monotonic alignment decay with turn count. Multi-turn context can strengthen refusal behavior, suggesting that safety evaluations should report turn-indexed trajectories rather than only final-turn success. At the same time, the gap between neutral histories and adversarial escalation highlights the need for standardized multi-turn attack benchmarks.
